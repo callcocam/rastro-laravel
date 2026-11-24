@@ -74,6 +74,11 @@ class WidgetRelayController extends Controller
         return $this->relay($request, 'POST', "widget/conversations/{$conversation}/close");
     }
 
+    public function rate(Request $request, string $conversation): JsonResponse
+    {
+        return $this->relay($request, 'POST', "widget/conversations/{$conversation}/rating");
+    }
+
     public function feedback(Request $request, string $node): JsonResponse
     {
         return $this->relay($request, 'POST', "widget/help/{$node}/feedback");
@@ -81,7 +86,7 @@ class WidgetRelayController extends Controller
 
     protected function relay(Request $request, string $method, string $path, bool $withContext = false): JsonResponse
     {
-        $body = $request->only(['name', 'email', 'message', 'body', 'help_path', 'context', 'helpful']);
+        $body = $request->only(['name', 'email', 'message', 'body', 'help_path', 'context', 'helpful', 'rating', 'comment']);
 
         if ($withContext) {
             $body['visitor'] = [

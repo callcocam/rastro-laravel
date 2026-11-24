@@ -43,6 +43,8 @@ interface State {
     /** The AI is answering (until it hands over or an agent replies). */
     ai?: { active: boolean; thinking: boolean };
     messages: ChatMessage[];
+    /** "How was the service?", asked once it closed; `score` once answered. */
+    rating?: { score: number | null; comment: string | null } | null;
 }
 
 interface HelpOption {
@@ -581,7 +583,33 @@ async function end() {
     }
 }
 
+const ratingPick = ref<number | null>(null);
+const ratingComment = ref('');
+const rating = ref(false);
+
+async function sendRating() {
+    if (!state.value || !ratingPick.value || rating.value) {
+        return;
+    }
+
+    rating.value = true;
+
+    try {
+        state.value = await call<State>(
+            'POST',
+            `/conversations/${state.value.id}/rating`,
+            { rating: ratingPick.value, comment: ratingComment.value || null },
+        );
+    } catch {
+        error.value = s('error');
+    } finally {
+        rating.value = false;
+    }
+}
+
 function reset() {
+    ratingPick.value = null;
+    ratingComment.value = '';
     state.value = null;
     token.value = null;
     seen.value = 0;
@@ -974,6 +1002,47 @@ function time(iso: string): string {
                 </footer>
 
                 <footer v-else class="wsw-composer">
+                    <div v-if="state.rating" class="wsw-rating">
+                        <template v-if="state.rating.score === null">
+                            <strong>{{ s('rating_question') }}</strong>
+                            <div class="wsw-stars">
+                                <button
+                                    v-for="score in 5"
+                                    :key="score"
+                                    type="button"
+                                    :class="{ on: (ratingPick ?? 0) >= score }"
+                                    :aria-label="
+                                        s('rating_star').replace(
+                                            ':score',
+                                            String(score),
+                                        )
+                                    "
+                                    @click="ratingPick = score"
+                                >
+                                    ★
+                                </button>
+                            </div>
+                            <template v-if="ratingPick">
+                                <textarea
+                                    v-model="ratingComment"
+                                    rows="2"
+                                    maxlength="1000"
+                                    :placeholder="s('rating_comment')"
+                                />
+                                <button
+                                    type="button"
+                                    class="wsw-btn primary"
+                                    :disabled="rating"
+                                    @click="sendRating"
+                                >
+                                    {{ s('rating_send') }}
+                                </button>
+                            </template>
+                        </template>
+                        <p v-else class="wsw-system">
+                            {{ s('rating_thanks') }}
+                        </p>
+                    </div>
                     <p class="wsw-system">{{ s('closed') }}</p>
                     <button
                         type="button"
@@ -1308,6 +1377,45 @@ function time(iso: string): string {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+.wsw-rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: center;
+}
+
+.wsw-stars {
+    display: flex;
+    gap: 4px;
+}
+
+.wsw-stars button {
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: var(--wsw-border);
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.wsw-stars button.on {
+    color: #f59e0b;
+}
+
+.wsw-rating textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--wsw-border);
+    border-radius: 10px;
+    background: var(--wsw-bg);
+    color: var(--wsw-text);
+    font: inherit;
+    resize: vertical;
 }
 
 .wsw-help-link {

@@ -72,6 +72,7 @@ class RastroServiceProvider extends ServiceProvider
             Route::post('/conversations/{conversation}/messages', [WidgetRelayController::class, 'message'])->name('message')->whereUlid('conversation');
             Route::post('/conversations/{conversation}/handoff', [WidgetRelayController::class, 'handoff'])->name('handoff')->whereUlid('conversation');
             Route::post('/conversations/{conversation}/close', [WidgetRelayController::class, 'close'])->name('close')->whereUlid('conversation');
+            Route::post('/conversations/{conversation}/rating', [WidgetRelayController::class, 'rate'])->name('rating')->whereUlid('conversation');
             Route::post('/help/{node}/feedback', [WidgetRelayController::class, 'feedback'])->name('help.feedback')->whereUlid('node');
         });
     }
