@@ -50,6 +50,7 @@ interface HelpOption {
     label: string;
     prompt: string | null;
     answer_html: string | null;
+    help_link: { url: string; kind: 'video' | 'page' } | null;
     children: HelpOption[];
 }
 
@@ -122,7 +123,11 @@ function pick(option: HelpOption) {
     feedback.value = null;
 
     // An option with nothing behind it goes straight to a person.
-    if (!option.answer_html && option.children.length === 0) {
+    if (
+        !option.answer_html &&
+        !option.help_link &&
+        option.children.length === 0
+    ) {
         asking.value = true;
     }
 }
@@ -731,6 +736,24 @@ function time(iso: string): string {
                             class="wsw-answer"
                             v-html="helpNode.answer_html"
                         />
+                        <a
+                            v-if="helpNode.help_link"
+                            class="wsw-help-link"
+                            :href="helpNode.help_link.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <span aria-hidden="true">{{
+                                helpNode.help_link.kind === 'video' ? '▶' : '↗'
+                            }}</span>
+                            {{
+                                s(
+                                    helpNode.help_link.kind === 'video'
+                                        ? 'help_video'
+                                        : 'help_page',
+                                )
+                            }}
+                        </a>
                     </template>
                 </div>
 
@@ -747,7 +770,10 @@ function time(iso: string): string {
                 </div>
 
                 <div
-                    v-if="helpNode?.answer_html && helpOptions.length === 0"
+                    v-if="
+                        (helpNode?.answer_html || helpNode?.help_link) &&
+                        helpOptions.length === 0
+                    "
                     class="wsw-options"
                 >
                     <template v-if="feedback === 'yes'">
@@ -1282,6 +1308,23 @@ function time(iso: string): string {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+.wsw-help-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--wsw-accent);
+    color: var(--wsw-accent-text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.wsw-help-link:hover {
+    opacity: 0.9;
 }
 
 .wsw-option {
