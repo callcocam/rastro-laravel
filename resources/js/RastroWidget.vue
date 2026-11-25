@@ -63,6 +63,14 @@ interface Config {
     user: { name: string; email: string } | null;
     max_length: number;
     poll_ms: number;
+    /** Chosen in the central's panel ("Chat do site"); absent on older centrals. */
+    theme?: Theme | null;
+}
+
+interface Theme {
+    accent: string | null;
+    position: 'right' | 'left';
+    mode: 'auto' | 'light' | 'dark';
 }
 
 const props = withDefaults(
@@ -74,6 +82,48 @@ const props = withDefaults(
 );
 
 const config = ref<Config | null>(null);
+
+/**
+ * The central's look: classes for the corner and light/dark, and the color as
+ * --wsw-theme-* variables. The site's own CSS still wins: it sets --wsw-*,
+ * which only fall back to these (see CUSTOMIZING.md).
+ */
+const themeClasses = computed(() => {
+    const theme = config.value?.theme;
+
+    return {
+        'wsw-left': theme?.position === 'left',
+        'wsw-light': theme?.mode === 'light',
+        'wsw-dark': theme?.mode === 'dark',
+    };
+});
+
+const themeStyle = computed<Record<string, string>>(() => {
+    const accent = config.value?.theme?.accent;
+
+    if (!accent || !/^#[0-9a-f]{6}$/i.test(accent)) {
+        return {};
+    }
+
+    return {
+        '--wsw-theme-accent': accent,
+        '--wsw-theme-accent-text': readableOn(accent),
+    };
+});
+
+/** White or near-black, whichever reads better on the color (WCAG luminance). */
+function readableOn(hex: string): string {
+    const [r, g, b] = [1, 3, 5].map((at) => {
+        const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
+
+        return channel <= 0.03928
+            ? channel / 12.92
+            : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? '#18181b' : '#ffffff';
+}
+
 const expanded = ref(false);
 const state = ref<State | null>(null);
 const token = ref<string | null>(null);
@@ -722,7 +772,12 @@ function time(iso: string): string {
 </script>
 
 <template>
-    <div v-if="config" class="wsw" :class="{ expanded }">
+    <div
+        v-if="config"
+        class="wsw"
+        :class="[{ expanded }, themeClasses]"
+        :style="themeStyle"
+    >
         <section
             v-if="expanded"
             class="wsw-panel"
@@ -1070,33 +1125,62 @@ function time(iso: string): string {
 </template>
 
 <style scoped>
+/*
+ * Colors, in this order: the site's own --wsw-* (on :root, .dark or any
+ * parent; see CUSTOMIZING.md), then the central's theme (--wsw-theme-*, set
+ * inline from the panel), then these defaults. The widget reads only the
+ * internal --_wsw-* below, so a site never fights selector specificity.
+ */
 .wsw {
-    --wsw-bg: #ffffff;
-    --wsw-panel: #f4f4f5;
-    --wsw-border: #e4e4e7;
-    --wsw-text: #18181b;
-    --wsw-muted: #71717a;
-    --wsw-accent: #2563eb;
-    --wsw-accent-text: #ffffff;
-    --wsw-mine: #dbeafe;
-    --wsw-danger: #dc2626;
+    --_wsw-bg: var(--wsw-bg, #ffffff);
+    --_wsw-panel: var(--wsw-panel, #f4f4f5);
+    --_wsw-border: var(--wsw-border, #e4e4e7);
+    --_wsw-text: var(--wsw-text, #18181b);
+    --_wsw-muted: var(--wsw-muted, #71717a);
+    --_wsw-accent: var(--wsw-accent, var(--wsw-theme-accent, #2563eb));
+    --_wsw-accent-text: var(
+        --wsw-accent-text,
+        var(--wsw-theme-accent-text, #ffffff)
+    );
+    --_wsw-mine: var(
+        --wsw-mine,
+        color-mix(in srgb, var(--_wsw-accent) 16%, var(--_wsw-bg))
+    );
+    --_wsw-danger: var(--wsw-danger, #dc2626);
 
     position: fixed;
     right: 16px;
     bottom: 16px;
     z-index: 60;
-    color: var(--wsw-text);
+    color: var(--_wsw-text);
     font-size: 14px;
 }
 
-:global(.dark) .wsw {
-    --wsw-bg: #0a0a0b;
-    --wsw-panel: #1f1f23;
-    --wsw-border: #27272a;
-    --wsw-text: #f4f4f5;
-    --wsw-muted: #a1a1aa;
-    --wsw-accent: #3b82f6;
-    --wsw-mine: #1e3a8a;
+/* Whatever the site's reset, fields fit the panel. */
+.wsw *,
+.wsw *::before,
+.wsw *::after {
+    box-sizing: border-box;
+}
+
+.wsw.wsw-left {
+    right: auto;
+    left: 16px;
+}
+
+/* Dark: when the site's html has `dark` (mode "auto"), or always ("dark"). */
+:global(.dark .wsw:not(.wsw-light)),
+.wsw.wsw-dark {
+    --_wsw-bg: var(--wsw-bg, #0a0a0b);
+    --_wsw-panel: var(--wsw-panel, #1f1f23);
+    --_wsw-border: var(--wsw-border, #27272a);
+    --_wsw-text: var(--wsw-text, #f4f4f5);
+    --_wsw-muted: var(--wsw-muted, #a1a1aa);
+    --_wsw-accent: var(--wsw-accent, var(--wsw-theme-accent, #3b82f6));
+    --_wsw-mine: var(
+        --wsw-mine,
+        color-mix(in srgb, var(--_wsw-accent) 35%, var(--_wsw-bg))
+    );
 }
 
 .wsw-launcher {
@@ -1107,8 +1191,8 @@ function time(iso: string): string {
     padding: 12px 18px;
     border: 0;
     border-radius: 999px;
-    background: var(--wsw-accent);
-    color: var(--wsw-accent-text);
+    background: var(--_wsw-accent);
+    color: var(--_wsw-accent-text);
     box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
     cursor: pointer;
     font: inherit;
@@ -1123,7 +1207,7 @@ function time(iso: string): string {
     height: 22px;
     padding: 0 6px;
     border-radius: 999px;
-    background: var(--wsw-danger);
+    background: var(--_wsw-danger);
     color: #fff;
     font-size: 12px;
     line-height: 22px;
@@ -1135,9 +1219,9 @@ function time(iso: string): string {
     flex-direction: column;
     width: min(380px, calc(100vw - 32px));
     height: min(560px, calc(100vh - 32px));
-    border: 1px solid var(--wsw-border);
+    border: 1px solid var(--_wsw-border);
     border-radius: 16px;
-    background: var(--wsw-bg);
+    background: var(--_wsw-bg);
     box-shadow: 0 16px 48px rgb(0 0 0 / 0.22);
     overflow: hidden;
 }
@@ -1148,8 +1232,8 @@ function time(iso: string): string {
     justify-content: space-between;
     gap: 8px;
     padding: 14px 16px;
-    background: var(--wsw-accent);
-    color: var(--wsw-accent-text);
+    background: var(--_wsw-accent);
+    color: var(--_wsw-accent-text);
 }
 
 .wsw-head div {
@@ -1187,7 +1271,7 @@ function time(iso: string): string {
 }
 
 .wsw-start small {
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-weight: 400;
 }
 
@@ -1195,10 +1279,10 @@ function time(iso: string): string {
 .wsw textarea {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--wsw-border);
+    border: 1px solid var(--_wsw-border);
     border-radius: 8px;
-    background: var(--wsw-bg);
-    color: var(--wsw-text);
+    background: var(--_wsw-bg);
+    color: var(--_wsw-text);
     font: inherit;
     resize: none;
 }
@@ -1210,7 +1294,7 @@ function time(iso: string): string {
     gap: 8px;
     padding: 14px;
     overflow-y: auto;
-    background: var(--wsw-bg);
+    background: var(--_wsw-bg);
 }
 
 .wsw-msg {
@@ -1230,11 +1314,11 @@ function time(iso: string): string {
     max-width: 82%;
     padding: 8px 12px;
     border-radius: 12px;
-    background: var(--wsw-panel);
+    background: var(--_wsw-panel);
 }
 
 .wsw-msg.contact .wsw-bubble {
-    background: var(--wsw-mine);
+    background: var(--_wsw-mine);
 }
 
 .wsw-bubble p {
@@ -1249,12 +1333,12 @@ function time(iso: string): string {
 }
 
 .wsw-msg.bot .wsw-bubble {
-    border: 1px dashed var(--wsw-muted);
+    border: 1px dashed var(--_wsw-muted);
 }
 
 .wsw-bot-tag {
     display: block;
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-size: 11px;
 }
 
@@ -1271,14 +1355,14 @@ function time(iso: string): string {
 
 .wsw-bubble time {
     display: block;
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-size: 11px;
     text-align: right;
 }
 
 .wsw-system {
     margin: 0;
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-size: 12px;
     text-align: center;
 }
@@ -1288,7 +1372,7 @@ function time(iso: string): string {
     flex-direction: column;
     gap: 8px;
     padding: 12px;
-    border-top: 1px solid var(--wsw-border);
+    border-top: 1px solid var(--_wsw-border);
 }
 
 .wsw-row {
@@ -1306,10 +1390,10 @@ function time(iso: string): string {
 
 .wsw-btn {
     padding: 8px 12px;
-    border: 1px solid var(--wsw-border);
+    border: 1px solid var(--_wsw-border);
     border-radius: 8px;
-    background: var(--wsw-bg);
-    color: var(--wsw-text);
+    background: var(--_wsw-bg);
+    color: var(--_wsw-text);
     cursor: pointer;
     font: inherit;
 }
@@ -1320,14 +1404,14 @@ function time(iso: string): string {
 }
 
 .wsw-btn.primary {
-    border-color: var(--wsw-accent);
-    background: var(--wsw-accent);
-    color: var(--wsw-accent-text);
+    border-color: var(--_wsw-accent);
+    background: var(--_wsw-accent);
+    color: var(--_wsw-accent-text);
 }
 
 .wsw-btn.danger {
-    border-color: var(--wsw-danger);
-    background: var(--wsw-danger);
+    border-color: var(--_wsw-danger);
+    background: var(--_wsw-danger);
     color: #fff;
 }
 
@@ -1335,7 +1419,7 @@ function time(iso: string): string {
     align-self: center;
     border: 0;
     background: transparent;
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     cursor: pointer;
     font: inherit;
     font-size: 12px;
@@ -1371,7 +1455,7 @@ function time(iso: string): string {
 }
 
 .wsw-answer :deep(a) {
-    color: var(--wsw-accent);
+    color: var(--_wsw-accent);
 }
 
 .wsw-options {
@@ -1398,7 +1482,7 @@ function time(iso: string): string {
     padding: 0 2px;
     border: 0;
     background: transparent;
-    color: var(--wsw-border);
+    color: var(--_wsw-border);
     font-size: 28px;
     line-height: 1;
     cursor: pointer;
@@ -1411,10 +1495,10 @@ function time(iso: string): string {
 .wsw-rating textarea {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--wsw-border);
+    border: 1px solid var(--_wsw-border);
     border-radius: 10px;
-    background: var(--wsw-bg);
-    color: var(--wsw-text);
+    background: var(--_wsw-bg);
+    color: var(--_wsw-text);
     font: inherit;
     resize: vertical;
 }
@@ -1426,8 +1510,8 @@ function time(iso: string): string {
     margin-top: 10px;
     padding: 8px 12px;
     border-radius: 10px;
-    background: var(--wsw-accent);
-    color: var(--wsw-accent-text);
+    background: var(--_wsw-accent);
+    color: var(--_wsw-accent-text);
     font-weight: 600;
     text-decoration: none;
 }
@@ -1438,27 +1522,27 @@ function time(iso: string): string {
 
 .wsw-option {
     padding: 9px 12px;
-    border: 1px solid var(--wsw-accent);
+    border: 1px solid var(--_wsw-accent);
     border-radius: 10px;
-    background: var(--wsw-bg);
-    color: var(--wsw-accent);
+    background: var(--_wsw-bg);
+    color: var(--_wsw-accent);
     cursor: pointer;
     font: inherit;
     text-align: left;
 }
 
 .wsw-option:hover {
-    background: var(--wsw-mine);
+    background: var(--_wsw-mine);
 }
 
 .wsw-question {
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-size: 12px;
 }
 
 .wsw-trail {
     margin: 0;
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-size: 11px;
 }
 
@@ -1472,14 +1556,14 @@ function time(iso: string): string {
 
 .wsw-notice {
     margin: 0;
-    color: var(--wsw-muted);
+    color: var(--_wsw-muted);
     font-size: 11px;
     line-height: 1.4;
 }
 
 .wsw-error {
     margin: 0;
-    color: var(--wsw-danger);
+    color: var(--_wsw-danger);
     font-size: 12px;
 }
 </style>
