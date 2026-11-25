@@ -467,6 +467,7 @@ async function call<T>(
             payload.message ?? String(response.status),
         ) as Error & { status?: number };
         failure.status = response.status;
+
         throw failure;
     }
 
