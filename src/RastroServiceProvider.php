@@ -2,6 +2,8 @@
 
 namespace Callcocam\Rastro;
 
+use Callcocam\Rastro\Console\HelpGuide;
+use Callcocam\Rastro\Console\HelpPush;
 use Callcocam\Rastro\Console\ProjectScan;
 use Callcocam\Rastro\Context\RecordLogErrors;
 use Callcocam\Rastro\Context\RecordServerTrail;
@@ -41,7 +43,7 @@ class RastroServiceProvider extends ServiceProvider
         $this->registerRecording();
 
         if ($this->app->runningInConsole()) {
-            $this->commands([ProjectScan::class]);
+            $this->commands([ProjectScan::class, HelpGuide::class, HelpPush::class]);
 
             $this->publishes([__DIR__.'/../config/rastro.php' => config_path('rastro.php')], 'rastro-config');
 
