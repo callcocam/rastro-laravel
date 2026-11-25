@@ -18,12 +18,16 @@ it('has only the chat endpoints', function () {
 });
 
 it('serves the central texts with the logged-in user of this site', function () {
-    Http::fake(['central.test/*' => Http::response(['strings' => ['title' => 'Suporte'], 'help' => [], 'max_length' => 2000, 'poll_ms' => 3000, 'context' => true])]);
+    Http::fake(['central.test/*' => Http::response([
+        'strings' => ['title' => 'Suporte'], 'help' => [], 'max_length' => 2000, 'poll_ms' => 3000, 'context' => true,
+        'theme' => ['accent' => '#e11d48', 'position' => 'left', 'mode' => 'dark'],
+    ])]);
 
     $this->actingAs(new GenericUser(['id' => 7, 'name' => 'Maria', 'email' => 'maria@site.test']))
         ->getJson('support/widget/config')
         ->assertOk()
         ->assertJsonPath('strings.title', 'Suporte')
+        ->assertJsonPath('theme.accent', '#e11d48')
         ->assertJsonPath('user.email', 'maria@site.test');
 
     Http::assertSent(fn (Request $request) => $request->url() === 'https://central.test/support/api/widget/config'
