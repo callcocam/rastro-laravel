@@ -56,9 +56,23 @@ As conversas chegam na caixa de entrada do Rastro, junto com as do WhatsApp e do
 | Laravel com Blade, Livewire ou Inertia React | Tag `<x-rastro::widget />` no layout                | Pronto   |
 | Painel Filament (v3 e v4)                    | Plugin `RastroPlugin` no painel                     | Pronto   |
 | Laravel com Inertia e Vue 3                  | Componente `RastroWidget.vue` ou a tag Blade        | Pronto   |
-| Site sem Laravel (só JavaScript)             | `<script>` com a chave pública do site              | Em breve |
+| Site sem Laravel (HTML, WordPress, React…)   | `<script>` com a chave pública do site, sem pacote  | Pronto   |
 
-Nos três primeiros, o chat tem tudo: o login reconhecido, o rastro do servidor e a árvore de dúvidas pela IA. O chat da tag e do plugin já vem compilado, com o Vue dentro, e é servido pelo próprio pacote: o seu sistema não precisa ter Vue nem compilar nada.
+Nos três primeiros, com este pacote, o chat tem tudo: o login reconhecido, o rastro do servidor e a árvore de dúvidas pela IA. O chat da tag e do plugin já vem compilado, com o Vue dentro, e é servido pelo próprio pacote: o seu sistema não precisa ter Vue nem compilar nada.
+
+### Site sem Laravel
+
+Não precisa deste pacote. No painel do Rastro, em **Chat do site › Site sem Laravel**, crie o site, informe os domínios dele e cole o código antes do `</body>`:
+
+```html
+<script
+    src="https://rastro.support/embed/rastro-widget.js"
+    data-site="pk_a-chave-do-site"
+    defer
+></script>
+```
+
+O chat só abre nos domínios informados. Sem o pacote, o Rastro não sabe quem está logado (o cliente digita o nome e o e-mail) e o rastro traz só o que aconteceu no navegador. Passo a passo: https://rastro.support/ajuda/instalar-o-chat.
 
 ## Requisitos
 
