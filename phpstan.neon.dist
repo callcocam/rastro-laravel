@@ -8,6 +8,10 @@ parameters:
 
     level: 6
 
+    # Loaded only on Filament sites; Filament is not a dependency of this package.
+    excludePaths:
+        - src/Filament/
+
     ignoreErrors:
         -
             identifier: larastan.noEnvCallsOutsideOfConfig

@@ -24,6 +24,9 @@
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.20"
     },
+    "suggest": {
+        "filament/filament": "The chat on a Filament panel: ->plugin(\\Callcocam\\Rastro\\Filament\\RastroPlugin::make())."
+    },
     "autoload": {
         "psr-4": {
             "Callcocam\\Rastro\\": "src/"
