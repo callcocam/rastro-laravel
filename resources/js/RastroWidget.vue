@@ -14,6 +14,10 @@ import {
  *   <RastroWidget />                       (endpoint defaults to /support/widget)
  *   <RastroWidget :endpoint="url" />       (when the prefix was changed)
  *
+ * Compiled with Vue inside (dist/rastro-widget.js), it also goes on Blade
+ * and Filament sites (<x-rastro::widget />, RastroPlugin) and, with a
+ * site's public key, straight on a site without Laravel (see embed.ts).
+ *
  * It talks JSON to the package's widget routes and polls for answers. The
  * conversation id + token live in localStorage, so the chat survives page
  * changes and reloads. Self-contained CSS; every text comes from the Rastro
@@ -74,10 +78,19 @@ interface Theme {
 }
 
 const props = withDefaults(
-    defineProps<{ endpoint?: string; storageKey?: string }>(),
+    defineProps<{
+        endpoint?: string;
+        storageKey?: string;
+        /**
+         * A site without Laravel: its public key, sent to the central's
+         * `support/embed` endpoints (another origin: no cookies).
+         */
+        siteKey?: string;
+    }>(),
     {
         endpoint: '/support/widget',
         storageKey: 'rastro',
+        siteKey: undefined,
     },
 );
 
@@ -98,7 +111,7 @@ const themeClasses = computed(() => {
     };
 });
 
-const themeStyle = computed<Record<string, string>>(() => {
+const themeStyle = computed((): Record<string, string> => {
     const accent = config.value?.theme?.accent;
 
     if (!accent || !/^#[0-9a-f]{6}$/i.test(accent)) {
@@ -324,6 +337,19 @@ function startTrail() {
         );
     }) as EventListener);
 
+    // Livewire (Filament) and Turbo screen changes without a full load.
+    for (const name of ['livewire:navigated', 'turbo:load']) {
+        listen(document, name, (() => {
+            const url = safeUrl(window.location.href);
+            const last = readTrail().events.at(-1);
+
+            // Both also fire on the first load, already noted.
+            if (last?.type !== 'page' || last.url !== url) {
+                record({ type: 'page', url, title: document.title });
+            }
+        }) as EventListener);
+    }
+
     listen(document, 'inertia:start', ((event: CustomEvent) => {
         const visit = event.detail?.visit;
         const method = String(visit?.method ?? 'get').toLowerCase();
@@ -489,8 +515,13 @@ async function call<T>(
     const headers: Record<string, string> = {
         Accept: 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
-        'X-XSRF-TOKEN': xsrfToken(),
     };
+
+    if (props.siteKey) {
+        headers['X-Support-Site'] = props.siteKey;
+    } else {
+        headers['X-XSRF-TOKEN'] = xsrfToken();
+    }
 
     if (body !== undefined) {
         headers['Content-Type'] = 'application/json';
@@ -500,7 +531,11 @@ async function call<T>(
         headers['X-Support-Token'] = token.value;
     }
 
-    const init: RequestInit = { method, headers, credentials: 'same-origin' };
+    const init: RequestInit = {
+        method,
+        headers,
+        credentials: props.siteKey ? 'omit' : 'same-origin',
+    };
 
     if (body !== undefined) {
         init.body = JSON.stringify(body);

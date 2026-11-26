@@ -10,6 +10,7 @@ use Callcocam\Rastro\Context\RecordServerTrail;
 use Callcocam\Rastro\Context\Sanitizer;
 use Callcocam\Rastro\Context\ServerTrail;
 use Callcocam\Rastro\Http\WidgetRelayController;
+use Callcocam\Rastro\Http\WidgetScriptController;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
@@ -36,6 +37,9 @@ class RastroServiceProvider extends ServiceProvider
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'rastro');
 
+        // <x-rastro::widget />: the compiled chat, for Blade, Filament and React sites.
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'rastro');
+
         if ($this->app['config']->get('rastro.routes', true)) {
             $this->registerRoutes();
         }
@@ -61,6 +65,14 @@ class RastroServiceProvider extends ServiceProvider
     protected function registerRoutes(): void
     {
         $config = $this->app['config'];
+
+        // The compiled chat: no session or throttle, it is a static file.
+        $script = Route::get(trim((string) $config->get('rastro.widget.prefix', 'support/widget'), '/').'/rastro-widget.js', WidgetScriptController::class)
+            ->name($config->get('rastro.widget.name', 'rastro.widget').'.script');
+
+        if ($domain = $config->get('rastro.widget.domain')) {
+            $script->domain($domain);
+        }
 
         Route::group(array_filter([
             'domain' => $config->get('rastro.widget.domain') ?: null,
