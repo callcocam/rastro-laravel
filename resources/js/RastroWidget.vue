@@ -311,6 +311,98 @@ function markTrailSent() {
 
 const listeners: Array<[EventTarget, string, EventListener]> = [];
 
+/**
+ * Livewire hooks cannot be removed, so they are added once per page and
+ * write to whichever widget is mounted now.
+ */
+let livewireRecorder: typeof record | null = null;
+let livewireHooked = false;
+
+type LivewireHooks = {
+    hook: (
+        name: 'commit' | 'request',
+        callback: (payload: {
+            succeed: (callback: (response: { snapshot: string }) => void) => void;
+            fail: (callback: (response: { status: number }) => void) => void;
+        }) => void,
+    ) => void;
+};
+
+function firstMessages(errors: unknown): Record<string, string> {
+    const messages: Record<string, string> = {};
+
+    for (const [field, message] of Object.entries(
+        (errors ?? {}) as Record<string, unknown>,
+    )) {
+        messages[field] = String(
+            Array.isArray(message) ? (message[0] ?? '') : message,
+        ).slice(0, 200);
+    }
+
+    return messages;
+}
+
+function hookLivewire(livewire: LivewireHooks) {
+    if (livewireHooked) {
+        return;
+    }
+
+    livewireHooked = true;
+
+    livewire.hook('commit', ({ succeed }) => {
+        succeed(({ snapshot }) => {
+            let errors: Record<string, string> = {};
+
+            try {
+                errors = firstMessages(JSON.parse(snapshot)?.memo?.errors);
+            } catch {
+                return;
+            }
+
+            if (Object.keys(errors).length > 0) {
+                livewireRecorder?.({
+                    type: 'validation',
+                    url: safeUrl(window.location.href),
+                    errors,
+                });
+            }
+        });
+    });
+
+    livewire.hook('request', ({ fail }) => {
+        fail(({ status }) => {
+            livewireRecorder?.(
+                status === 503 && !navigator.onLine
+                    ? { type: 'network_error', url: safeUrl(window.location.href) }
+                    : {
+                          type: 'http_error',
+                          status,
+                          url: safeUrl(window.location.href),
+                      },
+            );
+        });
+    });
+}
+
+function watchLivewire() {
+    livewireRecorder = record;
+    const livewire = (window as unknown as { Livewire?: LivewireHooks })
+        .Livewire;
+
+    if (livewire?.hook) {
+        hookLivewire(livewire);
+    } else {
+        document.addEventListener(
+            'livewire:init',
+            () =>
+                hookLivewire(
+                    (window as unknown as { Livewire: LivewireHooks }).Livewire,
+                ),
+            { once: true },
+        );
+    }
+}
+
 function listen(target: EventTarget, name: string, handler: EventListener) {
     target.addEventListener(name, handler, true);
     listeners.push([target, name, handler]);
@@ -392,6 +484,10 @@ function startTrail() {
     listen(document, 'inertia:networkError', (() => {
         record({ type: 'network_error', url: safeUrl(window.location.href) });
     }) as EventListener);
+
+    // Livewire (Filament): a validation error comes back as a normal
+    // response, with the messages in the component's snapshot.
+    watchLivewire();
 
     // Clicks on buttons and links — their text, never field values.
     listen(document, 'click', ((event: MouseEvent) => {
@@ -792,6 +888,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     clearTimeout(timer);
+    livewireRecorder = null;
 
     for (const [target, name, handler] of listeners) {
         target.removeEventListener(name, handler, true);
