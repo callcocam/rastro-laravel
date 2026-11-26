@@ -42,6 +42,20 @@ picked in the panel. Set only what you need; the rest falls back.
 | `--wsw-text` | Main text |
 | `--wsw-muted` | Secondary text (hints, times) |
 | `--wsw-danger` | Errors and the unread badge |
+| `--wsw-bottom` | Distance from the bottom of the screen (default `16px`, `12px` on phones) |
+| `--wsw-side` | Distance from the right (or left) edge (default `16px`, `12px` on phones) |
+
+On screens up to 640px wide the launcher is only a round 48px icon, so it
+covers less of the page. If it still sits on top of a bar of the site (a
+fixed "Save" footer, a bottom menu), lift it on phones only:
+
+```css
+@media (max-width: 640px) {
+    :root {
+        --wsw-bottom: 80px;
+    }
+}
+```
 
 ## Example: match the site's colors (light and dark)
 

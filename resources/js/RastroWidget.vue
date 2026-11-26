@@ -1247,10 +1247,25 @@ function time(iso: string): string {
             v-else
             type="button"
             class="wsw-launcher"
+            :aria-label="s('launcher')"
+            :title="s('launcher')"
             @click="expanded = true"
         >
-            <span aria-hidden="true">💬</span>
-            {{ s('launcher') }}
+            <svg
+                class="wsw-launcher-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <path
+                    d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12Z"
+                />
+            </svg>
+            <span class="wsw-launcher-text">{{ s('launcher') }}</span>
             <span v-if="unread > 0" class="wsw-badge">{{ unread }}</span>
         </button>
     </div>
@@ -1280,9 +1295,12 @@ function time(iso: string): string {
     );
     --_wsw-danger: var(--wsw-danger, #dc2626);
 
+    --_wsw-side: var(--wsw-side, 16px);
+    --_wsw-bottom: var(--wsw-bottom, 16px);
+
     position: fixed;
-    right: 16px;
-    bottom: 16px;
+    right: calc(var(--_wsw-side) + env(safe-area-inset-right, 0px));
+    bottom: calc(var(--_wsw-bottom) + env(safe-area-inset-bottom, 0px));
     z-index: 60;
     color: var(--_wsw-text);
     font-size: 14px;
@@ -1297,7 +1315,7 @@ function time(iso: string): string {
 
 .wsw.wsw-left {
     right: auto;
-    left: 16px;
+    left: calc(var(--_wsw-side) + env(safe-area-inset-left, 0px));
 }
 
 /* Dark: when the site's html has `dark` (mode "auto"), or always ("dark"). */
@@ -1329,6 +1347,55 @@ function time(iso: string): string {
     cursor: pointer;
     font: inherit;
     font-weight: 600;
+}
+
+.wsw-launcher-icon {
+    flex: none;
+    width: 20px;
+    height: 20px;
+}
+
+/*
+ * On a phone the launcher is only the round icon, so it does not cover the
+ * site's own buttons; the text stays as its label for screen readers.
+ */
+@media (max-width: 640px) {
+    .wsw {
+        --_wsw-side: var(--wsw-side, 12px);
+        --_wsw-bottom: var(--wsw-bottom, 12px);
+    }
+
+    .wsw-launcher {
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        padding: 0;
+        box-shadow: 0 4px 14px rgb(0 0 0 / 0.2);
+    }
+
+    .wsw-launcher-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    .wsw-launcher-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .wsw-launcher .wsw-badge {
+        top: -4px;
+        right: -4px;
+    }
+
+    .wsw-panel.wsw-panel {
+        width: calc(100vw - 2 * var(--_wsw-side));
+        height: min(560px, calc(100dvh - 2 * var(--_wsw-bottom)));
+    }
 }
 
 .wsw-badge {

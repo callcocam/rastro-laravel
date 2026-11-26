@@ -301,6 +301,16 @@ Para seguir as cores do seu sistema, defina as variáveis `--wsw-*` no CSS do se
 }
 ```
 
+No celular (telas de até 640px), o botão vira só um ícone redondo de 48px. Se ele ainda ficar em cima de uma barra fixa do seu sistema, como um rodapé com "Salvar", suba o botão só no celular:
+
+```css
+@media (max-width: 640px) {
+    :root {
+        --wsw-bottom: 80px; /* distância do pé da tela; --wsw-side é a da lateral */
+    }
+}
+```
+
 Todas as variáveis, um exemplo completo de claro e escuro e um roteiro para a IA estão em [CUSTOMIZING.md](CUSTOMIZING.md).
 
 ## O que vai junto com a dúvida
