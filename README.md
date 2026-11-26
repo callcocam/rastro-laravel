@@ -44,25 +44,28 @@ As conversas chegam na caixa de entrada do Rastro, junto com as do WhatsApp e do
                                └──────────────────────────┘
 ```
 
-1. O chat (`RastroWidget.vue`) fala **só com o seu próprio sistema**, no mesmo domínio. A sessão e o login do cliente vão juntos, e não precisa de CORS.
+1. O chat fala **só com o seu próprio sistema**, no mesmo domínio. A sessão e o login do cliente vão juntos, e não precisa de CORS.
 2. O seu sistema repassa a conversa para a central do Rastro, de servidor para servidor, com a chave do site (`RASTRO_KEY`). **A chave nunca vai para o navegador.**
 3. Junto com cada mensagem vão quem está logado (nome, e-mail e id), o rastro do navegador e o rastro do servidor.
 4. O pacote **não cria tabelas nem telas**. Ele não guarda as conversas: elas ficam no Rastro.
 
 ## Em quais sistemas funciona
 
-| Sistema                                      | Situação      |
-| -------------------------------------------- | ------------- |
-| Laravel com Inertia e Vue 3                  | Pronto        |
-| Laravel com Blade, Livewire ou Inertia React | Em breve      |
-| Painel Filament (v3 e v4)                    | Em breve      |
-| Site sem Laravel (só JavaScript)             | Em breve      |
+| Sistema                                      | Como o chat entra                                   | Situação |
+| -------------------------------------------- | --------------------------------------------------- | -------- |
+| Laravel com Blade, Livewire ou Inertia React | Tag `<x-rastro::widget />` no layout                | Pronto   |
+| Painel Filament (v3 e v4)                    | Plugin `RastroPlugin` no painel                     | Pronto   |
+| Laravel com Inertia e Vue 3                  | Componente `RastroWidget.vue` ou a tag Blade        | Pronto   |
+| Site sem Laravel (só JavaScript)             | `<script>` com a chave pública do site              | Em breve |
+
+Nos três primeiros, o chat tem tudo: o login reconhecido, o rastro do servidor e a árvore de dúvidas pela IA. O chat da tag e do plugin já vem compilado, com o Vue dentro, e é servido pelo próprio pacote: o seu sistema não precisa ter Vue nem compilar nada.
 
 ## Requisitos
 
 - PHP 8.3 ou mais novo
 - Laravel 11, 12 ou 13
-- Para o chat: Inertia com Vue 3, compilado pelo Vite do seu projeto
+- Sessão no grupo `web` (o padrão do Laravel)
+- Para o plugin: Filament 3 ou 4. Para o componente Vue: Inertia com Vue 3, compilado pelo Vite do seu projeto
 - Uma central no [Rastro](https://rastro.support) e uma **chave do site**, criada no painel da central em **Chaves dos sites**
 
 ## Instalação rápida com a sua IA
@@ -97,13 +100,48 @@ RASTRO_KEY=rk_a-chave-que-voce-criou
 
 No `.env.example`, deixe as duas vazias. **Nunca faça commit da chave.**
 
-### 4. Publique o chat e coloque no layout
+### 4. Coloque o chat no seu sistema
+
+Escolha o jeito do seu tipo de sistema. Coloque o chat **uma vez só** por página.
+
+#### Blade, Livewire ou Inertia com React
+
+Coloque a tag antes do `</body>` do layout principal. Em sistemas Inertia, o layout é o `resources/views/app.blade.php`:
+
+```blade
+    <x-rastro::widget />
+</body>
+```
+
+Não precisa compilar nada: o pacote serve o chat em `/support/widget/rastro-widget.js`. Com `wire:navigate` (Livewire) ou Turbo, o chat continua aberto na troca de tela.
+
+#### Filament
+
+Registre o plugin em cada painel em que o chat deve aparecer:
+
+```php
+// app/Providers/Filament/AdminPanelProvider.php
+use Callcocam\Rastro\Filament\RastroPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        // ...
+        ->plugin(RastroPlugin::make());
+}
+```
+
+O plugin coloca o chat no fim de todas as páginas do painel. Não precisa mexer em nenhum Blade.
+
+#### Inertia com Vue 3
+
+A tag Blade acima também funciona aqui, e é o jeito mais simples: coloque `<x-rastro::widget />` no `resources/views/app.blade.php`. Se preferir o chat dentro da árvore do Vue, publique o componente:
 
 ```bash
 php artisan vendor:publish --tag=rastro-widget
 ```
 
-Isso cria `resources/js/components/rastro/RastroWidget.vue`. Coloque o chat **uma vez só**, no layout das telas onde ele deve aparecer:
+Isso cria `resources/js/components/rastro/RastroWidget.vue`. Coloque o componente no layout:
 
 ```vue
 <!-- resources/js/layouts/AppLayout.vue -->
@@ -120,38 +158,28 @@ import RastroWidget from '@/components/rastro/RastroWidget.vue';
 </template>
 ```
 
-> Não edite o `RastroWidget.vue` publicado. Para mudar as cores, use as variáveis CSS (veja [Aparência](#aparência)). Assim, quando o pacote for atualizado, basta publicar de novo (veja [Atualizar o pacote](#atualizar-o-pacote)).
+> Não edite o `RastroWidget.vue` publicado. Para mudar as cores, use as variáveis CSS (veja [Aparência](#aparência)). Uma cópia publicada não recebe as atualizações sozinha: a cada versão nova, publique de novo (veja [Atualizar o pacote](#atualizar-o-pacote)). Com a tag Blade, isso não é preciso.
 
 ### 5. Compile e teste
 
 ```bash
 php artisan config:clear   # se o projeto usa cache de configuração
-npm run build
+npm run build              # só se você publicou o RastroWidget.vue
 ```
 
 Abra o sistema. O botão do chat aparece no canto da tela. Mande uma mensagem de teste: ela chega na caixa de entrada do Rastro. Se a pessoa estiver logada, o nome e o e-mail já vêm preenchidos.
 
 ## Exemplos
 
-### Nas telas logadas e no site público
+### Só para quem está logado
 
-Se o sistema tem mais de um layout, coloque `<RastroWidget />` em cada um em que o chat deve aparecer. A conversa continua entre as telas e depois de recarregar a página, porque fica guardada no navegador.
-
-```vue
-<!-- resources/js/layouts/AuthLayout.vue (login, cadastro, esqueci a senha) -->
-<script setup lang="ts">
-import RastroWidget from '@/components/rastro/RastroWidget.vue';
-</script>
-
-<template>
-    <main>
-        <slot />
-        <RastroWidget />
-    </main>
-</template>
+```blade
+@auth
+    <x-rastro::widget />
+@endauth
 ```
 
-### Só para quem está logado
+No Vue, com o componente publicado:
 
 ```vue
 <script setup lang="ts">
@@ -171,6 +199,41 @@ const loggedIn = computed(() => Boolean(page.props.auth?.user));
 </template>
 ```
 
+### Nas telas logadas e no site público
+
+Coloque o chat em cada layout em que ele deve aparecer: por exemplo, no layout do painel e no das telas de login e cadastro. A conversa continua entre as telas e depois de recarregar a página, porque fica guardada no navegador.
+
+### React: escolher quando o chat aparece
+
+A tag monta o chat sozinha. Para decidir no React quando ele aparece, carregue o script em modo manual e monte pelo `window.Rastro`:
+
+```blade
+{{-- resources/views/app.blade.php --}}
+<script src="{{ \Callcocam\Rastro\Widget::scriptUrl() }}" data-manual defer></script>
+```
+
+```tsx
+import { useEffect } from 'react';
+
+declare global {
+    interface Window {
+        Rastro?: { mount: (options?: { endpoint?: string; storageKey?: string }) => unknown; unmount: () => void };
+    }
+}
+
+export function RastroChat() {
+    useEffect(() => {
+        window.Rastro?.mount({ endpoint: '/support/widget' });
+
+        return () => window.Rastro?.unmount();
+    }, []);
+
+    return null;
+}
+```
+
+Coloque `<RastroChat />` só nas telas em que o chat deve aparecer.
+
 ### Outro endereço para o chat
 
 Por padrão, o chat conversa com o seu sistema em `/support/widget`. Se esse endereço já está em uso:
@@ -179,13 +242,19 @@ Por padrão, o chat conversa com o seu sistema em `/support/widget`. Se esse end
 RASTRO_WIDGET_PREFIX=ajuda/chat
 ```
 
+A tag Blade e o plugin do Filament usam o endereço novo sozinhos. No componente Vue, passe o endereço:
+
 ```vue
 <RastroWidget endpoint="/ajuda/chat" />
 ```
 
 ### Dois sistemas no mesmo domínio
 
-A conversa fica guardada no navegador com a chave `rastro`. Se dois sistemas seus rodam no mesmo domínio, dê um nome diferente para cada um, para as conversas não se misturarem:
+A conversa fica guardada no navegador com o nome `rastro`. Se dois sistemas seus rodam no mesmo domínio, dê um nome diferente para cada um, para as conversas não se misturarem:
+
+```blade
+<x-rastro::widget storage-key="rastro-financeiro" />
+```
 
 ```vue
 <RastroWidget storage-key="rastro-financeiro" />
@@ -327,6 +396,7 @@ Com `RASTRO_ROUTES=true` (padrão), o pacote registra, com o prefixo `support/wi
 
 | Método | Endereço                                  | Nome                          |
 | ------ | ----------------------------------------- | ----------------------------- |
+| GET    | `/rastro-widget.js`                       | `rastro.widget.script`        |
 | GET    | `/config`                                 | `rastro.widget.config`        |
 | POST   | `/conversations`                          | `rastro.widget.store`         |
 | GET    | `/conversations/{conversation}`           | `rastro.widget.show`          |
@@ -336,13 +406,17 @@ Com `RASTRO_ROUTES=true` (padrão), o pacote registra, com o prefixo `support/wi
 | POST   | `/conversations/{conversation}/rating`    | `rastro.widget.rating`        |
 | POST   | `/help/{node}/feedback`                   | `rastro.widget.help.feedback` |
 
+O `/rastro-widget.js` é o chat compilado, usado pela tag Blade e pelo plugin do Filament. Ele não passa pela sessão nem pelo limite de requisições, e o navegador guarda o arquivo até a próxima versão do pacote.
+
 O chat manda o token CSRF (`X-XSRF-TOKEN`) como qualquer requisição do Laravel, então nada precisa sair da proteção de CSRF. Cada conversa é protegida por um token próprio (`X-Support-Token`), guardado no navegador de quem abriu a conversa.
 
-Para registrar as rotas você mesmo, por exemplo com outro middleware:
+Para registrar as rotas você mesmo, por exemplo com outro middleware (inclua também a do script, se usar a tag Blade ou o Filament):
 
 ```php
 // routes/web.php
 use Callcocam\Rastro\Http\WidgetRelayController;
+
+Route::get('support/widget/rastro-widget.js', \Callcocam\Rastro\Http\WidgetScriptController::class)->name('rastro.widget.script');
 
 Route::prefix('support/widget')->middleware(['web', 'auth', 'throttle:60,1'])->name('rastro.widget.')->group(function () {
     Route::get('/config', [WidgetRelayController::class, 'config'])->name('config');
@@ -368,17 +442,26 @@ Route::prefix('support/widget')->middleware(['web', 'auth', 'throttle:60,1'])->n
 
 ```bash
 composer update callcocam/rastro-laravel
+```
+
+Com a tag Blade ou o plugin do Filament, é só isso: o chat novo já vai para os navegadores.
+
+Se você publicou o `RastroWidget.vue`, publique de novo e compile:
+
+```bash
 php artisan vendor:publish --tag=rastro-widget --force
 npm run build
 ```
 
-O `--force` troca o `RastroWidget.vue` publicado pela versão nova: novidades, correções e os filtros de privacidade. Por isso as cores ficam nas variáveis CSS, e não no arquivo.
+O `--force` troca o arquivo publicado pela versão nova, com as novidades, as correções e os filtros de privacidade. Por isso as cores ficam nas variáveis CSS, e não no arquivo.
 
 ## Problemas comuns
 
 | O que acontece                                      | O que fazer                                                                           |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| O botão do chat não aparece                         | Confira se `<RastroWidget />` está no layout certo e se você rodou `npm run build`    |
+| O botão do chat não aparece                         | Confira se a tag, o plugin ou o `<RastroWidget />` está no layout certo. Com o componente Vue, rode `npm run build`. Com a tag, abra `/support/widget/rastro-widget.js` no navegador: ele deve carregar |
+| O chat aparece em um painel do Filament e não em outro | Registre o `RastroPlugin` em cada painel                                        |
+| O navegador bloqueia o script                       | Se o sistema tem Content Security Policy, libere scripts do próprio domínio (`script-src 'self'`) |
 | O chat diz "O suporte está indisponível agora"      | Confira `RASTRO_URL` e `RASTRO_KEY` e rode `php artisan config:clear`. Se a central recusar a chave, o log mostra `rastro: the central refused the key (RASTRO_KEY)`. Se a chave foi apagada no painel, crie outra |
 | Erro 419 ao mandar mensagem                         | A sessão expirou ou o cookie `XSRF-TOKEN` não chega. Confira se as rotas do chat estão no grupo `web` |
 | Erro 404 em `/support/widget/config`                | As rotas não foram registradas: confira `RASTRO_ROUTES`, `RASTRO_WIDGET_PREFIX`, `RASTRO_WIDGET_DOMAIN` e rode `php artisan route:clear` |
@@ -389,7 +472,7 @@ Mais ajuda: https://rastro.support/ajuda, ou escreva para contato@rastro.support
 
 ## Para agentes de IA
 
-O pacote traz orientações para o [Laravel Boost](https://github.com/laravel/boost) (`resources/boost`): a regra de não editar o chat e a skill `rastro-widget-theme`, para ajustar as cores ao sistema. Um agente que instala o chat deve seguir o guia https://rastro.support/ajuda/instalar-o-chat, e um que muda a aparência deve seguir o [CUSTOMIZING.md](CUSTOMIZING.md).
+O pacote traz orientações para o [Laravel Boost](https://github.com/laravel/boost) (`resources/boost`): onde o chat entra em cada tipo de sistema, a regra de não editar o chat nem copiar o `dist/rastro-widget.js` para o projeto, e a skill `rastro-widget-theme`, para ajustar as cores ao sistema. Um agente que instala o chat deve seguir o guia https://rastro.support/ajuda/instalar-o-chat, e um que muda a aparência deve seguir o [CUSTOMIZING.md](CUSTOMIZING.md).
 
 ## Desenvolvimento do pacote
 
@@ -397,7 +480,11 @@ O pacote traz orientações para o [Laravel Boost](https://github.com/laravel/bo
 composer install
 composer test        # Pint, PHPStan e Pest
 composer lint        # formata com o Pint
+npm install
+npm run build        # gera dist/rastro-widget.js depois de mudar RastroWidget.vue ou embed.ts
 ```
+
+O `dist/rastro-widget.js` vai no Git, para o `composer require` bastar no sistema do cliente.
 
 ## Licença
 
