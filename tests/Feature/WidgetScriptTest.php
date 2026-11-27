@@ -24,7 +24,13 @@ it('renders the tag with the current version and this site\'s relay', function (
     expect($html)->toContain('support/widget/rastro-widget.js?v='.Widget::version())
         ->toContain('data-endpoint="http://localhost/support/widget"')
         ->toContain('data-navigate-once')
-        ->not->toContain('data-storage-key');
+        ->not->toContain('data-storage-key')
+        ->not->toContain('data-launcher');
+});
+
+it('leaves the floating button out when the site opens the chat from its own button', function () {
+    expect(Blade::render('<x-rastro::widget :launcher="false" />'))
+        ->toContain('data-launcher="false"');
 });
 
 it('passes another endpoint and storage key along', function () {

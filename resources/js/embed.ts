@@ -14,18 +14,23 @@ import RastroWidget from './RastroWidget.vue';
  *       a site without Laravel, straight to the central with its public key
  *
  * With data-manual, nothing mounts until window.Rastro.mount({ … }) (React's
- * useEffect, for instance).
+ * useEffect, for instance). With data-launcher="false" there is no floating
+ * button: the site's own button calls window.Rastro.open().
  */
 
 interface MountOptions {
     endpoint?: string;
     storageKey?: string;
     siteKey?: string;
+    launcher?: boolean;
 }
 
 interface RastroGlobal {
     mount: (options?: MountOptions) => App;
     unmount: () => void;
+    open: () => void;
+    close: () => void;
+    toggle: () => void;
 }
 
 declare global {
@@ -60,7 +65,9 @@ function boot(script: HTMLScriptElement | null): void {
             document.body.appendChild(element);
 
             const props = Object.fromEntries(
-                Object.entries(options).filter(([, value]) => value),
+                Object.entries(options).filter(
+                    ([, value]) => value !== undefined && value !== '',
+                ),
             );
             const app = createApp(RastroWidget, props);
             app.mount(element);
@@ -74,6 +81,10 @@ function boot(script: HTMLScriptElement | null): void {
             mounted?.element.remove();
             mounted = null;
         },
+
+        open: () => window.dispatchEvent(new Event('rastro:open')),
+        close: () => window.dispatchEvent(new Event('rastro:close')),
+        toggle: () => window.dispatchEvent(new Event('rastro:toggle')),
     };
 
     window.Rastro = rastro;
@@ -90,6 +101,7 @@ function boot(script: HTMLScriptElement | null): void {
         endpoint,
         siteKey,
         storageKey: script.dataset.storageKey || undefined,
+        launcher: script.dataset.launcher === 'false' ? false : undefined,
     };
 
     if (document.body) {

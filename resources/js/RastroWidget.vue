@@ -86,11 +86,17 @@ const props = withDefaults(
          * `support/embed` endpoints (another origin: no cookies).
          */
         siteKey?: string;
+        /**
+         * false hides the floating button: the site opens the chat from its
+         * own button with `window.dispatchEvent(new Event('rastro:open'))`.
+         */
+        launcher?: boolean;
     }>(),
     {
         endpoint: '/support/widget',
         storageKey: 'rastro',
         siteKey: undefined,
+        launcher: true,
     },
 );
 
@@ -858,12 +864,38 @@ function schedule() {
     }, delay);
 }
 
+/*
+ * The site's own help button talks to the chat with window events:
+ * `rastro:open`, `rastro:close` and `rastro:toggle` in, and `rastro:unread`
+ * ({ detail: { count } }) out. While the chat is up, <html> carries
+ * `data-rastro="ready"` and `data-rastro-unread`, for a button that mounts later.
+ */
+const outsideEvents: Array<[string, () => void]> = [
+    ['rastro:open', () => (expanded.value = true)],
+    ['rastro:close', () => (expanded.value = false)],
+    ['rastro:toggle', () => (expanded.value = !expanded.value)],
+];
+
+watch(unread, (count) => {
+    document.documentElement.dataset.rastroUnread = String(count);
+    window.dispatchEvent(
+        new CustomEvent('rastro:unread', { detail: { count } }),
+    );
+});
+
 onMounted(async () => {
     try {
         config.value = await call<Config>('GET', '/config');
     } catch {
         return;
     }
+
+    for (const [name, handler] of outsideEvents) {
+        window.addEventListener(name, handler);
+    }
+
+    document.documentElement.dataset.rastro = 'ready';
+    window.dispatchEvent(new Event('rastro:ready'));
 
     if (config.value.context) {
         startTrail();
@@ -888,6 +920,13 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     clearTimeout(timer);
+
+    for (const [name, handler] of outsideEvents) {
+        window.removeEventListener(name, handler);
+    }
+
+    delete document.documentElement.dataset.rastro;
+    delete document.documentElement.dataset.rastroUnread;
     livewireRecorder = null;
 
     for (const [target, name, handler] of listeners) {
@@ -1244,7 +1283,7 @@ function time(iso: string): string {
         </section>
 
         <button
-            v-else
+            v-else-if="launcher"
             type="button"
             class="wsw-launcher"
             :aria-label="s('launcher')"
