@@ -39,6 +39,13 @@ interface ChatMessage {
     author_name: string | null;
     body: string;
     created_at: string;
+    /** Files the team sent; `url` is a signed link to download one. */
+    attachments?: Array<{
+        id: string;
+        filename: string;
+        size: number;
+        url: string | null;
+    }>;
 }
 
 interface State {
@@ -934,6 +941,12 @@ onBeforeUnmount(() => {
     }
 });
 
+function fileSize(bytes: number): string {
+    return bytes >= 1024 * 1024
+        ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+        : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 function time(iso: string): string {
     return new Date(iso).toLocaleTimeString(undefined, {
         hour: '2-digit',
@@ -1161,7 +1174,26 @@ function time(iso: string): string {
                                 class="wsw-bot-tag"
                                 >🤖 {{ s('bot_notice') }}</span
                             >
-                            <p>{{ message.body }}</p>
+                            <p v-if="message.body">{{ message.body }}</p>
+                            <ul
+                                v-if="message.attachments?.length"
+                                class="wsw-files"
+                            >
+                                <li
+                                    v-for="file in message.attachments"
+                                    :key="file.id"
+                                >
+                                    <a
+                                        v-if="file.url"
+                                        :href="file.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download
+                                        >📎 {{ file.filename }}
+                                        <small>{{ fileSize(file.size) }}</small></a
+                                    >
+                                </li>
+                            </ul>
                             <time>{{ time(message.created_at) }}</time>
                         </div>
                     </div>
@@ -1589,6 +1621,35 @@ function time(iso: string): string {
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 8px;
+}
+
+.wsw-files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0 2px;
+    padding: 0;
+    list-style: none;
+}
+
+.wsw-files a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 4px 10px;
+    border: 1px solid var(--wsw-border);
+    border-radius: 8px;
+    background: var(--wsw-bg);
+    color: var(--wsw-accent);
+    overflow-wrap: anywhere;
+    text-decoration: none;
+}
+
+.wsw-files small {
+    margin-left: auto;
+    color: var(--wsw-muted);
+    white-space: nowrap;
 }
 
 .wsw-bubble time {
