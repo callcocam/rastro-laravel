@@ -45,6 +45,8 @@ interface ChatMessage {
         filename: string;
         size: number;
         url: string | null;
+        /** Inline link of an image, for the thumbnail. */
+        preview_url?: string | null;
     }>;
 }
 
@@ -1184,7 +1186,19 @@ function time(iso: string): string {
                                     :key="file.id"
                                 >
                                     <a
-                                        v-if="file.url"
+                                        v-if="file.url && file.preview_url"
+                                        :href="file.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="wsw-thumb"
+                                        :title="file.filename"
+                                        ><img
+                                            :src="file.preview_url"
+                                            :alt="file.filename"
+                                            loading="lazy"
+                                    /></a>
+                                    <a
+                                        v-else-if="file.url"
                                         :href="file.url"
                                         target="_blank"
                                         rel="noopener noreferrer"
@@ -1644,6 +1658,20 @@ function time(iso: string): string {
     color: var(--wsw-accent);
     overflow-wrap: anywhere;
     text-decoration: none;
+}
+
+.wsw-files a.wsw-thumb {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.wsw-thumb img {
+    display: block;
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
 }
 
 .wsw-files small {
